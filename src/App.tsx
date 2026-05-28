@@ -519,12 +519,18 @@ export default function App() {
               setClientRajaongkirKey(serverData.cs_pos_rajaongkir_key);
               localStorage.setItem('cs_pos_rajaongkir_key', serverData.cs_pos_rajaongkir_key);
             }
-            if (serverData.torky_custom_logo !== undefined && serverData.torky_custom_logo !== null) {
-              localStorage.setItem('torky_custom_logo', serverData.torky_custom_logo);
+            if (serverData.torky_has_custom_logo) {
+              const timestamp = serverData.torky_custom_logo_ts || Date.now();
+              localStorage.setItem('torky_custom_logo', `/api/logo?t=${timestamp}`);
+              window.dispatchEvent(new Event('torky_logo_changed'));
+            } else if (serverData.torky_has_custom_logo === false) {
+              localStorage.removeItem('torky_custom_logo');
               window.dispatchEvent(new Event('torky_logo_changed'));
             }
           } else {
             console.log('[Torky Sync] Central database empty, pushing current browser settings up as bootstrap state.');
+            const localLogo = localStorage.getItem('torky_custom_logo');
+            const logoToSync = (localLogo && !localLogo.startsWith('/api/logo')) ? localLogo : null;
             const bootstrapPayload = {
               cs_pos_products: products,
               cs_pos_installation_id: installationId,
@@ -540,7 +546,7 @@ export default function App() {
               cs_pos_usd_rate_sync_time: usdRateSyncTime,
               cs_pos_biteship_key: clientBiteshipKey,
               cs_pos_rajaongkir_key: clientRajaongkirKey,
-              torky_custom_logo: localStorage.getItem('torky_custom_logo'),
+              torky_custom_logo: logoToSync,
             };
 
             await fetch('/api/db-bulk', {
@@ -609,15 +615,19 @@ export default function App() {
               setInstallationId(serverData.cs_pos_installation_id);
               localStorage.setItem('cs_pos_installation_id', serverData.cs_pos_installation_id);
             }
-            if (serverData.torky_custom_logo !== undefined) {
+            if (serverData.torky_has_custom_logo !== undefined) {
               const currentLogo = localStorage.getItem('torky_custom_logo');
-              if (serverData.torky_custom_logo !== currentLogo) {
-                if (serverData.torky_custom_logo === null || serverData.torky_custom_logo === "") {
-                  localStorage.removeItem('torky_custom_logo');
-                } else {
-                  localStorage.setItem('torky_custom_logo', serverData.torky_custom_logo);
+              if (serverData.torky_has_custom_logo) {
+                const targetLogoUrl = `/api/logo?t=${serverData.torky_custom_logo_ts || 'default'}`;
+                if (currentLogo !== targetLogoUrl) {
+                  localStorage.setItem('torky_custom_logo', targetLogoUrl);
+                  window.dispatchEvent(new Event('torky_logo_changed'));
                 }
-                window.dispatchEvent(new Event('torky_logo_changed'));
+              } else {
+                if (currentLogo) {
+                  localStorage.removeItem('torky_custom_logo');
+                  window.dispatchEvent(new Event('torky_logo_changed'));
+                }
               }
             }
           }

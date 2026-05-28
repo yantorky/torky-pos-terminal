@@ -10,7 +10,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: "150mb" }));
+  app.use(express.urlencoded({ limit: "150mb", extended: true }));
 
   // File-based Local Database Single Source of Truth
   const DB_FILE = path.join(process.cwd(), "server-db.json");
@@ -40,9 +41,44 @@ async function startServer() {
   app.get("/api/db", (req, res) => {
     try {
       const db = loadDB();
-      res.json(db);
+      const responseData = { ...db };
+      
+      // Separate the heavy logo payload so standard sync payload remains tiny
+      if (responseData["torky_custom_logo"]) {
+        responseData["torky_has_custom_logo"] = true;
+        delete responseData["torky_custom_logo"];
+      } else {
+        responseData["torky_has_custom_logo"] = false;
+      }
+      
+      res.json(responseData);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get raw logo image binary directly
+  app.get("/api/logo", (req, res) => {
+    try {
+      const db = loadDB();
+      const logo = db["torky_custom_logo"];
+      if (logo && typeof logo === "string" && logo.startsWith("data:")) {
+        const parts = logo.split(",");
+        const mimeMatch = parts[0].match(/data:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : "image/png";
+        const base64Data = parts[1];
+        const img = Buffer.from(base64Data, "base64");
+        res.writeHead(200, {
+          "Content-Type": mime,
+          "Content-Length": img.length,
+          "Cache-Control": "public, max-age=3600"
+        });
+        res.end(img);
+      } else {
+        res.status(404).send("No logo uploaded");
+      }
+    } catch (err: any) {
+      res.status(500).send("Error reading logo from database");
     }
   });
 
@@ -64,6 +100,9 @@ async function startServer() {
       const { data } = req.body;
       const db = loadDB();
       db[key] = data;
+      if (key === "torky_custom_logo") {
+        db["torky_custom_logo_ts"] = Date.now();
+      }
       saveDB(db);
       res.json({ success: true, key });
     } catch (err: any) {
@@ -78,6 +117,9 @@ async function startServer() {
       if (data && typeof data === "object") {
         const db = loadDB();
         const updated = { ...db, ...data };
+        if (data.torky_custom_logo !== undefined && data.torky_custom_logo !== null) {
+          updated.torky_custom_logo_ts = Date.now();
+        }
         saveDB(updated);
         res.json({ success: true });
       } else {
