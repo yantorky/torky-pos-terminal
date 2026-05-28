@@ -38,6 +38,9 @@ interface DashboardViewProps {
   };
   onUpdateStoreConfig: (config: any) => void;
   onResetAllData?: () => void;
+  licensedKey?: string;
+  heartbeatStatus?: any;
+  onUpgradeLicense?: (key: string) => void;
 }
 
 export default function DashboardView({ 
@@ -50,6 +53,9 @@ export default function DashboardView({
   storeConfig,
   onUpdateStoreConfig,
   onResetAllData,
+  licensedKey = '',
+  heartbeatStatus = null,
+  onUpgradeLicense
 }: DashboardViewProps) {
   const [hasCustomLogo, setHasCustomLogo] = useState<boolean>(() => {
     return !!localStorage.getItem('torky_custom_logo');
@@ -758,6 +764,59 @@ export default function DashboardView({
                     <span className="w-4 h-4 rounded-full bg-teal-105 text-teal-700 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
                     <p><strong>PWA / Standalone Mandiri</strong>: Sistem ini berjalan 100% aman tanpa tergantung server luar, sempurna untuk mengelola transaksi kasir dan servis harian!</p>
                   </div>
+                </div>
+              </div>
+
+              {/* STATUS LISENSI & PERANGKAT TERHUBUNG */}
+              <div className="bg-gradient-to-br from-indigo-50/40 to-blue-50/10 border border-indigo-100 p-5 rounded-2xl space-y-4 shadow-2xs mt-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-indigo-100/30">
+                  <Laptop className="w-5 h-5 text-indigo-600" />
+                  <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Status Multi-Client & Lisensi</h4>
+                </div>
+                
+                <div className="space-y-1.5 text-xs text-slate-600">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Kunci Lisensi:</span>
+                    <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">{licensedKey || 'Belum Diaktifkan'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Paket Lisensi:</span>
+                    <span className="font-bold text-slate-800">{heartbeatStatus?.packageName || 'Stand-Alone Solo Package'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Batas Kuota Alat:</span>
+                    <span className="font-bold font-mono text-indigo-600 bg-indigo-50/50 px-1.5 py-0.5 rounded">{heartbeatStatus?.limit || 1} Perangkat</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Terhubung Saat Ini:</span>
+                    <span className="font-extrabold text-emerald-600 font-mono">{heartbeatStatus?.activeCount || 1} Perangkat</span>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block font-mono mb-2">Daftar Terminal Terhubung (Live WITA):</span>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    {(heartbeatStatus?.activeClients || [
+                      { clientId: 'local', name: `${storeConfig.name} (${userRole || "Admin"})`, ip: '127.0.0.1', lastSeen: Date.now() }
+                    ]).map((client: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-center bg-white p-2 border border-slate-100 rounded-xl text-[11px] leading-tight">
+                        <div className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="font-bold text-slate-700">{client.name}</span>
+                        </div>
+                        <span className="font-mono text-[9px] text-slate-400 bg-slate-50 px-1 py-0.5 rounded">{client.ip}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 text-[10px] text-slate-500 font-sans leading-relaxed">
+                  💡 <strong>Info Jenis Paket Lisensi (Multi-Client)</strong>:<br />
+                  - <strong>Stand-Alone Solo</strong>: 1 Perangkat kasir utama lepas (stand-alone)<br />
+                  - <strong>Lite Team Package</strong>: Maksimal 3 perangkat tersambung serentak (akhiran key <code className="bg-slate-100 px-1 rounded">-LITE3</code>)<br />
+                  - <strong>Standard Store Package</strong>: Maksimal 5 perangkat tersambung serentak (akhiran key <code className="bg-slate-100 px-1 rounded">-STORE5</code>)<br />
+                  - <strong>Enterprise Ultimate Package</strong>: Maksimal 50 perangkat tersambung serentak (akhiran key <code className="bg-slate-100 px-1 rounded">-UNLIMITED</code>)<br />
+                  <span className="text-[9px] text-indigo-600 block mt-1 font-mono">Hubungi email resmi torkykomputer@gmail.com atau kunjungi website kami untuk melakukan upgrade lisensi!</span>
                 </div>
               </div>
             </div>

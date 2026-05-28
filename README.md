@@ -95,13 +95,22 @@ Terminal ini dirancang dengan arsitektur hibrida mutakhir yang mendukung dua ske
 
 ## 🔒 Proteksi Keamanan & Aktivasi Lisensi Produksi
 
-Aplikasi ini menggunakan skema lisensi keamanan **"Authorized Deployment"**:
+Aplikasi ini menggunakan skema lisensi keamanan **"Authorized Deployment"** dengan validasi server tingkat lanjut:
 
 *   **Mode Pengujian (Sandbox)**: Berjalan secara default untuk keperluan demo fungsionalitas lokal.
 *   **Mode Produksi (Licensed)**: Sistem memindai identitas periferal mesin fisik pelanggan saat instalasi untuk menghasilkan **Installation ID (Signature ID)** yang unik.
-*   **Aktivasi Resmi**: Kunci lisensi (*Activation Key*) yang valid didekripsi menggunakan algoritma internal yang diterbitkan eksklusif oleh pemegang hak cipta resmi:
-    *   **Penerbit Lisensi Tunggal**: Yan Torky (Torky Komputer)
-    *   **Kontak Resmi**: [torkykomputer@gmail.com](mailto:torkykomputer@gmail.com)
+*   **Aktivasi Resmi & Skema Tier Multi-Client**: Kunci lisensi (*Activation Key*) diverifikasi oleh client dan server secara otomatis. Akhiran (suffix) dari kunci menentukan kuota jumlah terminal aktif yang dapat berjalan secara simultan di jaringan lokal Anda:
+
+| Kode SKU Lisensi | Paket Lisensi | Kuota Alat Aktif | Deskripsi Skenario Penggunaan | Kunci Lisensi Contoh (*Pattern*) |
+| :--- | :--- | :--- | :--- | :--- |
+| **🏆 Standard Stand-Alone** | Solo Client | 1 Device | Cocok untuk toko/bengkel tunggal dengan 1 perangkat kasir utama. | `YNTK-LIC-...` (Tanpa Suffix) |
+| **⚡ Lite Multi-Client** | Lite Team | 3 Devices | Baik untuk 1 kasir utama + 2 kru teknisi pemantau servis di lapangan. | `YNTK-LIC-...-LITE3` |
+| **🏬 Store Multi-Client** | Standard Store | 5 Devices | Cocok untuk bisnis berkembang dengan kasir utama, admin gudang, dan beberapa teknisi. | `YNTK-LIC-...-STORE5` |
+| **👑 Enterprise Multi-Client** | Unlimited Store | 50 Devices | Deployment skala enterprise besar dengan puluhan terminal kasir dan stasiun servis tersinkronisasi. | `YNTK-LIC-...-UNLIMITED` |
+
+*   **Enforcement Proteksi Heartbeat**: Server (`server.ts`) melacak detak jantung (*Heartbeat*) dari setiap terminal yang terhubung setiap 4 detik. Jika jumlah terminal aktif melebihi batas kuota lisensi yang terpasang, server akan memblokir terminal tambahan secara aman dan menampilkan daftar perangkat aktif beserta alamat deskripsi IP-nya secara real-time. Hal ini melindungi investasi kekayaan intelektual *Yan Torky* dari penyalahgunaan satu lisensi di banyak perangkat sekaligus tanpa izin.
+*   **Penerbit Lisensi Tunggal**: Yan Torky (Torky Komputer)
+*   **Kontak Resmi**: [torkykomputer@gmail.com](mailto:torkykomputer@gmail.com)
 
 ---
 

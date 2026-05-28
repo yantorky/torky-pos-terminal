@@ -88,6 +88,116 @@ async function startServer() {
     }
   });
 
+  // Unique In-memory Active Clients Tracker
+  interface ActiveClient {
+    clientId: string;
+    name: string;
+    ip: string;
+    lastSeen: number;
+  }
+  
+  let activeClients: ActiveClient[] = [];
+
+  // Decode limit and Tier Name dynamically from Key Suffix (Enterprise Whitelabel Standard)
+  const getLicenseLimit = (key: string): { limit: number; name: string } => {
+    const val = (key || "").trim().toUpperCase();
+    if (!val) {
+      return { limit: 0, name: "Tanpa Lisensi / Unlicensed" };
+    }
+    if (val === "TORKY-POS-8822-APPROVED") {
+      return { limit: 2, name: "Sandbox Demo [Maks 2 Perangkat]" };
+    }
+    if (val.endsWith("-MX") || val.endsWith("-UNLIMITED") || val === "YANTORKY-LICENSE-2026-VALD") {
+      return { limit: 50, name: "Enterprise Ultimate Package [Maks 50 Perangkat]" };
+    }
+    if (val.endsWith("-M5") || val.endsWith("-STORE5")) {
+      return { limit: 5, name: "Standard Store Package [Maks 5 Perangkat]" };
+    }
+    if (val.endsWith("-M3") || val.endsWith("-LITE3")) {
+      return { limit: 3, name: "Lite Team Package [Maks 3 Perangkat]" };
+    }
+    // Default standard Activation Key gets 1 Device Max
+    return { limit: 1, name: "Stand-Alone Solo Package [Maks 1 Perangkat]" };
+  };
+
+  // Active client heartbeat polling & quota enforcement API route
+  app.post("/api/heartbeat", (req, res) => {
+    try {
+      const { clientId, name, licenseKey } = req.body;
+      if (!clientId) {
+        return res.status(400).json({ error: "clientId is required" });
+      }
+
+      const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "Unknown";
+      const now = Date.now();
+
+      // Clear stale hearts (> 12 seconds with no update)
+      activeClients = activeClients.filter((c) => now - c.lastSeen < 12000);
+
+      // Decrypt license quota limits
+      const { limit, name: packageName } = getLicenseLimit(licenseKey);
+
+      // Search if this client is already tracked
+      const existingIdx = activeClients.findIndex((c) => c.clientId === clientId);
+
+      if (existingIdx !== -1) {
+        activeClients[existingIdx].lastSeen = now;
+        activeClients[existingIdx].name = name || "Perangkat Kasir";
+        activeClients[existingIdx].ip = clientIp;
+        return res.json({
+          success: true,
+          status: "ok",
+          limit,
+          packageName,
+          activeCount: activeClients.length,
+          activeClients
+        });
+      }
+
+      // If client is new, check quota limit
+      if (activeClients.length >= limit) {
+        return res.json({
+          success: false,
+          status: "quota_exceeded",
+          limit,
+          packageName,
+          activeCount: activeClients.length + 1,
+          activeClients
+        });
+      }
+
+      // Add to tracking list
+      activeClients.push({
+        clientId,
+        name: name || "Perangkat Kasir",
+        ip: clientIp,
+        lastSeen: now,
+      });
+
+      res.json({
+        success: true,
+        status: "ok",
+        limit,
+        packageName,
+        activeCount: activeClients.length,
+        activeClients
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get active client list
+  app.get("/api/active-clients", (req, res) => {
+    try {
+      const now = Date.now();
+      activeClients = activeClients.filter((c) => now - c.lastSeen < 12000);
+      res.json(activeClients);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API Route for live exchange rates
   app.get("/api/currency/usd-idr", async (req, res) => {
     try {

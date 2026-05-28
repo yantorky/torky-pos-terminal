@@ -82,13 +82,39 @@ export default function App() {
     return localStorage.getItem('cs_pos_licensed_key') || '';
   });
 
+  const [clientUid] = useState<string>(() => {
+    let saved = localStorage.getItem('cs_pos_client_uid');
+    if (!saved) {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      saved = 'CLNT-' + Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      localStorage.setItem('cs_pos_client_uid', saved);
+    }
+    return saved;
+  });
+
+  // Keep track of connection health, package tier, and server client counts
+  const [heartbeatStatus, setHeartbeatStatus] = useState<{
+    success: boolean;
+    status: string;
+    packageName: string;
+    limit: number;
+    activeCount: number;
+    activeClients: Array<{ clientId: string; name: string; ip: string; lastSeen: number }>;
+  } | null>(null);
+
   // Verify license validity dynamically based on repo owner rules (Yan Torky)
   const isLicenseKeyValid = (key: string): boolean => {
     const val = key.trim().toUpperCase();
     if (val === 'TORKY-POS-8822-APPROVED' || val === 'YANTORKY-LICENSE-2026-VALD') {
       return true;
     }
-    if (val === generateLicenseFromId(installationId)) {
+    
+    const baseLicense = generateLicenseFromId(installationId);
+    if (val === baseLicense) {
+      return true;
+    }
+    // Allow valid base licenses appended with special capacity markers (-M3, -M5, -MX, etc.)
+    if (val.startsWith(baseLicense)) {
       return true;
     }
     return false;
@@ -544,6 +570,44 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isInitialLoaded]);
 
+  // Client Heartbeat effect for multi-client license quota enforcement
+  useEffect(() => {
+    if (!isInitialLoaded || !isActivated) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        const clientName = storeConfig?.name 
+          ? `${storeConfig.name} (${userRole || "Kasir"})` 
+          : `${operatorName || "Perangkat Kasir"} (${userRole || "Kasir"})`;
+          
+        const res = await fetch('/api/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: clientUid,
+            name: clientName,
+            licenseKey: licensedKey
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setHeartbeatStatus(data);
+        } else {
+          console.warn('[Heartbeat] Connection check failed');
+        }
+      } catch (err) {
+        console.warn('[Heartbeat] Server network unreachable:', err);
+      }
+    };
+
+    // run immediately and then poll every 4 seconds
+    sendHeartbeat();
+    const timer = setInterval(sendHeartbeat, 4000);
+
+    return () => clearInterval(timer);
+  }, [isInitialLoaded, isActivated, licensedKey, clientUid, storeConfig?.name, operatorName, userRole]);
+
   // CLIENTS & PELANGGAN B2B OPERATIONS
   const handleAddCustomer = (newCustomer: Customer) => {
     setCustomers((prev) => [newCustomer, ...prev]);
@@ -843,6 +907,118 @@ export default function App() {
       );
     }
 
+    if (heartbeatStatus && heartbeatStatus.status === 'quota_exceeded') {
+      return (
+        <div className="min-h-[85vh] bg-slate-950 flex items-center justify-center p-4 selection:bg-teal-500 selection:text-slate-950 font-sans relative">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(244,63,94,0.08),rgba(255,255,255,0))]" />
+          
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-lg bg-slate-900 border border-slate-850 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden z-10"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-rose-500 animate-pulse" />
+            
+            <div className="flex flex-col items-center text-center space-y-2 mb-6">
+              <div className="w-14 h-14 bg-rose-950/40 text-rose-400 border border-rose-900/40 rounded-2xl flex items-center justify-center shadow-lg mb-2">
+                <Shield className="w-7 h-7" />
+              </div>
+              <h2 className="text-lg sm:text-xl font-black text-white tracking-tight uppercase font-mono">
+                Batas Alat <span className="text-rose-400">Terlampaui</span>
+              </h2>
+              <p className="text-slate-400 text-xs font-semibold leading-relaxed max-w-md">
+                Kunci lisensi aktif dideteksi melebihi batas jumlah perangkat maksimal yang diizinkan untuk paket komersial saat ini!
+              </p>
+            </div>
+
+            <div className="bg-slate-950 border border-rose-950/50 p-4 rounded-2xl mb-5 text-left space-y-2.5">
+              <span className="text-[10px] font-black tracking-wider text-rose-400 uppercase block font-mono">
+                Sandi Lisensi Terpasang: <span className="text-slate-200">{licensedKey}</span>
+              </span>
+              <div className="space-y-1 text-xs text-slate-300 font-sans">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Kategori Paket:</span>
+                  <span className="font-bold text-slate-200">{heartbeatStatus.packageName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Kuota Maksimal:</span>
+                  <span className="font-bold font-mono text-rose-400">{heartbeatStatus.limit} Perangkat</span>
+                </div>
+              </div>
+            </div>
+
+            {/* List active terminals */}
+            <div className="space-y-2 mb-6">
+              <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase block font-mono">
+                Daftar Terminal Terhubung ({heartbeatStatus.activeClients?.length || 0}):
+              </span>
+              <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                {heartbeatStatus.activeClients?.map((client, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs bg-slate-950/60 border border-slate-850 p-3 rounded-xl">
+                    <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {client.name}
+                    </span>
+                    <span className="font-mono text-[9px] text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                      {client.ip}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-rose-950/20 text-rose-300 text-xs p-3.5 rounded-xl border border-rose-900/40 font-medium leading-relaxed mb-6">
+              💡 Tutup tab/browser kasir pada perangkat aktif lainnya di atas agar melepas slot kuota, atau tingkatkan lisensi toko Anda ke Multi-Client dengan memasukkan kunci berlisensi baru di bawah ini.
+            </div>
+
+            {/* Upgrade license form */}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const upgradedKey = (formData.get('partnerKey') as string).trim().toUpperCase();
+              if (upgradedKey && isLicenseKeyValid(upgradedKey)) {
+                localStorage.setItem('cs_pos_licensed_key', upgradedKey);
+                setLicensedKey(upgradedKey);
+                setHeartbeatStatus(null);
+              } else {
+                alert('Aktivasi Gagal! Kunci lisensi tidak valid untuk ID Signature instalasi ini.');
+              }
+            }} className="space-y-4">
+              <div className="space-y-1.5">
+                <input
+                  type="text"
+                  name="partnerKey"
+                  required
+                  placeholder="KODE LISENSI UPGRADE (e.g. YNTK-LIC-XXXX-XXXX-XXXX-M5)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-center text-xs font-bold text-teal-300 tracking-widest outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all font-mono"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('cs_pos_licensed_key');
+                    setLicensedKey('');
+                    setHeartbeatStatus(null);
+                  }}
+                  className="flex-1 py-2.5 px-4 bg-slate-950 hover:bg-slate-900 text-slate-400 border border-slate-850 rounded-xl text-xs font-bold transition-all text-center"
+                >
+                  GANTI LISENSI
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 px-4 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black rounded-xl text-xs transition-all tracking-wider shadow-lg shadow-teal-950/40 text-center uppercase"
+                >
+                  AKTIFKAN UPGRADE
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      );
+    }
+
     if (!isLoggedIn) {
       return (
         <LoginScreen
@@ -909,6 +1085,8 @@ export default function App() {
             storeConfig={storeConfig}
             onUpdateStoreConfig={setStoreConfig}
             onResetAllData={handleResetAllData}
+            licensedKey={licensedKey}
+            heartbeatStatus={heartbeatStatus}
           />
         );
       case 'pos':
