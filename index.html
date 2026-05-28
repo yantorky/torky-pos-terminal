@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Torky Komputer APP</title>
+    <!-- Fallback high-fidelity SVG icon matching the Torky Komputer primary branding logo -->
+    <link id="app-favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,%3Csvg viewBox='0 0 240 280' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='n' x1='30%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%230B2B9F'/%3E%3Cstop offset='50%25' stop-color='%231E5DCE'/%3E%3Cstop offset='100%25' stop-color='%233187F2'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='20%25' y1='10%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231954C0'/%3E%3Cstop offset='60%25' stop-color='%232E9AE4'/%3E%3Cstop offset='100%25' stop-color='%2355C9F1'/%3E%3C/linearGradient%3E%3ClinearGradient id='t' x1='10%25' y1='20%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23289EE2'/%3E%3Cstop offset='60%25' stop-color='%2343CECE'/%3E%3Cstop offset='100%25' stop-color='%2381EADF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M 113,18 C 111,55 116,110 160,158 C 182,182 208,185 210,155 C 212,125 192,85 174,68 C 152,47 125,25 113,18 Z' fill='url(%23n)'/%3E%3Cpath d='M 113,68 C 111,100 119,145 156,188 C 176,211 202,213 204,185 C 206,158 188,122 172,106 C 152,86 125,73 113,68 Z' fill='url(%23b)'/%3E%3Cpath d='M 118,120 C 117,144 122,180 152,212 C 168,229 192,231 194,208 C 196,186 182,156 168,143 C 151,127 128,124 118,120 Z' fill='url(%23t)'/%3E%3Cpath d='M 172,210 C 178,225 198,228 208,220 C 218,212 216,198 206,192' stroke='%234ECECD' stroke-width='12' stroke-linecap='round' fill='transparent'/%3E%3C/svg%3E" />
+    <script>
+      (function() {
+        // Automatically synchronize the favicon if a custom uploaded logo exists
+        try {
+          var customLogo = localStorage.getItem('torky_custom_logo');
+          if (customLogo) {
+            var icon = document.getElementById('app-favicon');
+            if (icon) {
+              icon.href = customLogo;
+              // Remove the type so custom data URLs work everywhere
+              icon.removeAttribute('type');
+            }
+          }
+        } catch (e) {
+          console.warn('Gagal memuat kustom favicon:', e);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

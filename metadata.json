@@ -1,0 +1,6 @@
+{
+  "name": "Torky Komputer POS",
+  "description": "Sistem Point of Sale (POS) & Service Komputer yang modern, intuitif dan responsif untuk Toko Torky Komputer - Anda Yang Utama.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
