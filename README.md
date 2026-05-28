@@ -41,7 +41,12 @@ Sistem ini menerapkan gerbang keamanan berlapis (*Multi-role Security Access*) m
 
 ## ⚡ Alur Arsitektur Sistem (Technical Topology)
 
-Terminal ini dirancang dengan arsitektur modular yang menjamin transaksi instan tanpa tunda (*zero latency*):
+Terminal ini dirancang dengan arsitektur hibrida mutakhir yang mendukung dua skenario deployment demi fleksibilitas operasional maksimal:
+
+1. **Mode Stand-Alone (Single-Device mode)**: 
+   Sistem menyimpan seluruh rincian konfigurasi, inventaris, transaksi, dan serialisasi lisensi langsung di tingkat peramban (`localStorage`). Pada mode ini, lisensi terikat langsung per unit peramban terpasang.
+2. **Mode Multi-Client Server Sync (Enterprise Local Sync - Terbaru 🚀)**:
+   Aplikasi secara pintar bertindak sebagai unit Full-Stack. Backend Node.js/Express (`server.ts`) mengelola database terpusat yang aman (`server-db.json`) sebagai *Single Source of Truth*. Data lisensi, pengaturan perusahaan, data stok, transaksi, dan pekerjaan servis disinkronisasikan secara otomatis tiap beberapa detik. Dengan skema ini, **Anda hanya perlu memasukkan lisensi aktivasi dan data perusahaan satu kali di server pusat**, lalu perangkat lain (seperti smartphone teknisi, komputer kasir tambahan, atau tablet pelayanan) di jaringan Wi-Fi lokal yang sama tinggal mengakses alamat IP server (contoh: `http://192.168.10.150:3000`) dan otomatis tersinkronisasi tanpa memerlukan aktivasi sekunder!
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -56,13 +61,18 @@ Terminal ini dirancang dengan arsitektur modular yang menjamin transaksi instan 
 ├────────────────────────────────────────────────────────────────────────┤
 │                     LOCAL STORAGE STATE & LEDGER                       │
 └────────────────────────────────────┬───────────────────────────────────┘
-                                     │
+                                     │ (Real-time Sync & Pull - v3.0)
                                      ▼
                       ┌─────────────────────────────┐
                       │    CENTRAL DATABASE STATE   │
-                      │   (Automatic Stock Update)  │
+                      │  (server-db.json on Server) │
                       └─────────────────────────────┘
 ```
+
+### 📱 Cara Kerja Sinkronisasi Multi-Device (Server-Client Sync)
+* **Server Utama**: Komputer utama di toko/bengkel menjalankan server produk via `npm start`.
+* **Klien Nirkabel (HP/Tablet/Laptop Lain)**: Terhubung ke jaringan Wi-Fi yang sama, lalu mengakses browser pada alamat IP lokal server (contoh: `http://192.168.10.150:3000`).
+* **Autosync Otomatis**: Klien HP akan mendeteksi status lisensi serta konfigurasi toko yang sudah diisi di server utama, mengunduh data tersebut secara otomatis ke local storage lokalnya, dan bersuara dalam satu database transaksi serta stok inventaris yang terpusat secara real-time.
 
 ---
 

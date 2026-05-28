@@ -49,6 +49,17 @@ import {
 } from './data';
 
 export default function App() {
+  const [isInitialLoaded, setIsInitialLoaded] = useState<boolean>(false);
+
+  const syncKeyToServer = (key: string, value: any) => {
+    if (!isInitialLoaded) return;
+    fetch(`/api/db/${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: value }),
+    }).catch((e) => console.warn(`[Sync Push] Error pushing ${key}:`, e));
+  };
+
   // Master Inventory, Jobs & Transactions sync-states
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('cs_pos_products');
@@ -56,7 +67,7 @@ export default function App() {
   });
 
   // Unique Installation Identifier for GitHub down-loads licensing control
-  const [installationId] = useState<string>(() => {
+  const [installationId, setInstallationId] = useState<string>(() => {
     let saved = localStorage.getItem('cs_pos_installation_id');
     if (!saved) {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -113,6 +124,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('cs_pos_staffs', JSON.stringify(staffs));
+    syncKeyToServer('cs_pos_staffs', staffs);
   }, [staffs]);
 
   // USD Global Currency Exchange Rate tracking
@@ -129,6 +141,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('cs_pos_usd_rate', usdRate.toString());
+    syncKeyToServer('cs_pos_usd_rate', usdRate);
   }, [usdRate]);
 
   // Handle global currency conversion rate updater
@@ -271,6 +284,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('cs_pos_store_config', JSON.stringify(storeConfig));
+    syncKeyToServer('cs_pos_store_config', storeConfig);
     // Trigger live event for UI components to reload
     window.dispatchEvent(new Event('torky_store_changed'));
   }, [storeConfig]);
@@ -288,6 +302,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('cs_pos_role_pins', JSON.stringify(rolePins));
+    syncKeyToServer('cs_pos_role_pins', rolePins);
   }, [rolePins]);
 
   // Interactive UI Simulation Settings
@@ -330,26 +345,204 @@ export default function App() {
     }
   }, [products]);
 
-  // Save changes to localStorage on any state modification
+  // Save changes to localStorage and replicate to the master POS database server
   useEffect(() => {
     localStorage.setItem('cs_pos_products', JSON.stringify(products));
+    syncKeyToServer('cs_pos_products', products);
   }, [products]);
 
   useEffect(() => {
     localStorage.setItem('cs_pos_jobs', JSON.stringify(jobs));
+    syncKeyToServer('cs_pos_jobs', jobs);
   }, [jobs]);
 
   useEffect(() => {
     localStorage.setItem('cs_pos_transactions', JSON.stringify(transactions));
+    syncKeyToServer('cs_pos_transactions', transactions);
   }, [transactions]);
 
   useEffect(() => {
     localStorage.setItem('cs_pos_customers', JSON.stringify(customers));
+    syncKeyToServer('cs_pos_customers', customers);
   }, [customers]);
 
   useEffect(() => {
     localStorage.setItem('cs_pos_suppliers', JSON.stringify(suppliers));
+    syncKeyToServer('cs_pos_suppliers', suppliers);
   }, [suppliers]);
+
+  useEffect(() => {
+    localStorage.setItem('cs_pos_licensed_key', licensedKey);
+    syncKeyToServer('cs_pos_licensed_key', licensedKey);
+  }, [licensedKey]);
+
+  useEffect(() => {
+    localStorage.setItem('cs_pos_installation_id', installationId);
+    syncKeyToServer('cs_pos_installation_id', installationId);
+  }, [installationId]);
+
+  // Unified State Synchronization Engine (Initial Load & Inter-Device Replication)
+  useEffect(() => {
+    const initSync = async () => {
+      try {
+        const res = await fetch('/api/db');
+        if (res.ok) {
+          const serverData = await res.json();
+          const hasServerData = serverData && Object.keys(serverData).length > 0;
+
+          if (hasServerData) {
+            console.log('[Torky Sync] Centralized database loaded from server:', serverData);
+            
+            if (serverData.cs_pos_products) {
+              setProducts(serverData.cs_pos_products);
+              localStorage.setItem('cs_pos_products', JSON.stringify(serverData.cs_pos_products));
+            }
+            if (serverData.cs_pos_installation_id) {
+              setInstallationId(serverData.cs_pos_installation_id);
+              localStorage.setItem('cs_pos_installation_id', serverData.cs_pos_installation_id);
+            }
+            if (serverData.cs_pos_licensed_key !== undefined) {
+              setLicensedKey(serverData.cs_pos_licensed_key);
+              localStorage.setItem('cs_pos_licensed_key', serverData.cs_pos_licensed_key);
+            }
+            if (serverData.cs_pos_jobs) {
+              setJobs(serverData.cs_pos_jobs);
+              localStorage.setItem('cs_pos_jobs', JSON.stringify(serverData.cs_pos_jobs));
+            }
+            if (serverData.cs_pos_transactions) {
+              setTransactions(serverData.cs_pos_transactions);
+              localStorage.setItem('cs_pos_transactions', JSON.stringify(serverData.cs_pos_transactions));
+            }
+            if (serverData.cs_pos_customers) {
+              setCustomers(serverData.cs_pos_customers);
+              localStorage.setItem('cs_pos_customers', JSON.stringify(serverData.cs_pos_customers));
+            }
+            if (serverData.cs_pos_suppliers) {
+              setSuppliers(serverData.cs_pos_suppliers);
+              localStorage.setItem('cs_pos_suppliers', JSON.stringify(serverData.cs_pos_suppliers));
+            }
+            if (serverData.cs_pos_staffs) {
+              setStaffs(serverData.cs_pos_staffs);
+              localStorage.setItem('cs_pos_staffs', JSON.stringify(serverData.cs_pos_staffs));
+            }
+            if (serverData.cs_pos_store_config) {
+              setStoreConfig(serverData.cs_pos_store_config);
+              localStorage.setItem('cs_pos_store_config', JSON.stringify(serverData.cs_pos_store_config));
+            }
+            if (serverData.cs_pos_role_pins) {
+              setRolePins(serverData.cs_pos_role_pins);
+              localStorage.setItem('cs_pos_role_pins', JSON.stringify(serverData.cs_pos_role_pins));
+            }
+            if (serverData.cs_pos_usd_rate) {
+              setUsdRate(Number(serverData.cs_pos_usd_rate));
+              localStorage.setItem('cs_pos_usd_rate', serverData.cs_pos_usd_rate.toString());
+            }
+            if (serverData.cs_pos_usd_rate_sync_time) {
+              setUsdRateSyncTime(serverData.cs_pos_usd_rate_sync_time);
+              localStorage.setItem('cs_pos_usd_rate_sync_time', serverData.cs_pos_usd_rate_sync_time);
+            }
+            if (serverData.cs_pos_biteship_key !== undefined) {
+              setClientBiteshipKey(serverData.cs_pos_biteship_key);
+              localStorage.setItem('cs_pos_biteship_key', serverData.cs_pos_biteship_key);
+            }
+            if (serverData.cs_pos_rajaongkir_key !== undefined) {
+              setClientRajaongkirKey(serverData.cs_pos_rajaongkir_key);
+              localStorage.setItem('cs_pos_rajaongkir_key', serverData.cs_pos_rajaongkir_key);
+            }
+          } else {
+            console.log('[Torky Sync] Central database empty, pushing current browser settings up as bootstrap state.');
+            const bootstrapPayload = {
+              cs_pos_products: products,
+              cs_pos_installation_id: installationId,
+              cs_pos_licensed_key: licensedKey,
+              cs_pos_jobs: jobs,
+              cs_pos_transactions: transactions,
+              cs_pos_customers: customers,
+              cs_pos_suppliers: suppliers,
+              cs_pos_staffs: staffs,
+              cs_pos_store_config: storeConfig,
+              cs_pos_role_pins: rolePins,
+              cs_pos_usd_rate: usdRate,
+              cs_pos_usd_rate_sync_time: usdRateSyncTime,
+              cs_pos_biteship_key: clientBiteshipKey,
+              cs_pos_rajaongkir_key: clientRajaongkirKey,
+            };
+
+            await fetch('/api/db-bulk', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ data: bootstrapPayload }),
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[Torky Sync] Central database error - fallback to offline browser localstorage mode:', err);
+      } finally {
+        setIsInitialLoaded(true);
+      }
+    };
+    initSync();
+  }, []);
+
+  // Periodic State Reconciliation Pulls from server db (makes multiclients updates synchronized automatically)
+  useEffect(() => {
+    if (!isInitialLoaded) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/db');
+        if (res.ok) {
+          const serverData = await res.json();
+          if (serverData && Object.keys(serverData).length > 0) {
+            if (serverData.cs_pos_products) {
+              setProducts(serverData.cs_pos_products);
+              localStorage.setItem('cs_pos_products', JSON.stringify(serverData.cs_pos_products));
+            }
+            if (serverData.cs_pos_jobs) {
+              setJobs(serverData.cs_pos_jobs);
+              localStorage.setItem('cs_pos_jobs', JSON.stringify(serverData.cs_pos_jobs));
+            }
+            if (serverData.cs_pos_transactions) {
+              setTransactions(serverData.cs_pos_transactions);
+              localStorage.setItem('cs_pos_transactions', JSON.stringify(serverData.cs_pos_transactions));
+            }
+            if (serverData.cs_pos_customers) {
+              setCustomers(serverData.cs_pos_customers);
+              localStorage.setItem('cs_pos_customers', JSON.stringify(serverData.cs_pos_customers));
+            }
+            if (serverData.cs_pos_suppliers) {
+              setSuppliers(serverData.cs_pos_suppliers);
+              localStorage.setItem('cs_pos_suppliers', JSON.stringify(serverData.cs_pos_suppliers));
+            }
+            if (serverData.cs_pos_staffs) {
+              setStaffs(serverData.cs_pos_staffs);
+              localStorage.setItem('cs_pos_staffs', JSON.stringify(serverData.cs_pos_staffs));
+            }
+            if (serverData.cs_pos_store_config) {
+              setStoreConfig(serverData.cs_pos_store_config);
+              localStorage.setItem('cs_pos_store_config', JSON.stringify(serverData.cs_pos_store_config));
+            }
+            if (serverData.cs_pos_role_pins) {
+              setRolePins(serverData.cs_pos_role_pins);
+              localStorage.setItem('cs_pos_role_pins', JSON.stringify(serverData.cs_pos_role_pins));
+            }
+            if (serverData.cs_pos_licensed_key !== undefined) {
+              setLicensedKey(serverData.cs_pos_licensed_key);
+              localStorage.setItem('cs_pos_licensed_key', serverData.cs_pos_licensed_key);
+            }
+            if (serverData.cs_pos_installation_id) {
+              setInstallationId(serverData.cs_pos_installation_id);
+              localStorage.setItem('cs_pos_installation_id', serverData.cs_pos_installation_id);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Sync Pull] Background sync error:', e);
+      }
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [isInitialLoaded]);
 
   // CLIENTS & PELANGGAN B2B OPERATIONS
   const handleAddCustomer = (newCustomer: Customer) => {
@@ -1481,6 +1674,8 @@ export default function App() {
                 onClick={() => {
                   localStorage.setItem('cs_pos_biteship_key', clientBiteshipKey);
                   localStorage.setItem('cs_pos_rajaongkir_key', clientRajaongkirKey);
+                  syncKeyToServer('cs_pos_biteship_key', clientBiteshipKey);
+                  syncKeyToServer('cs_pos_rajaongkir_key', clientRajaongkirKey);
                   setIsApiSettingsOpen(false);
                   
                   // Display confirmation and trigger component refresh

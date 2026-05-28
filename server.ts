@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import fs from "fs";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -10,6 +11,82 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // File-based Local Database Single Source of Truth
+  const DB_FILE = path.join(process.cwd(), "server-db.json");
+
+  const loadDB = () => {
+    if (!fs.existsSync(DB_FILE)) {
+      return {};
+    }
+    try {
+      const raw = fs.readFileSync(DB_FILE, "utf-8");
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error("[Database] Error reading database file:", err);
+      return {};
+    }
+  };
+
+  const saveDB = (data: any) => {
+    try {
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+    } catch (err) {
+      console.error("[Database] Error saving database file:", err);
+    }
+  };
+
+  // Get full centralized database
+  app.get("/api/db", (req, res) => {
+    try {
+      const db = loadDB();
+      res.json(db);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get single database key
+  app.get("/api/db/:key", (req, res) => {
+    try {
+      const db = loadDB();
+      const { key } = req.params;
+      res.json({ [key]: db[key] !== undefined ? db[key] : null });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update single database key
+  app.post("/api/db/:key", (req, res) => {
+    try {
+      const { key } = req.params;
+      const { data } = req.body;
+      const db = loadDB();
+      db[key] = data;
+      saveDB(db);
+      res.json({ success: true, key });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Save multiple database keys
+  app.post("/api/db-bulk", (req, res) => {
+    try {
+      const { data } = req.body;
+      if (data && typeof data === "object") {
+        const db = loadDB();
+        const updated = { ...db, ...data };
+        saveDB(updated);
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ error: "Invalid payload structured" });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // API Route for live exchange rates
   app.get("/api/currency/usd-idr", async (req, res) => {
