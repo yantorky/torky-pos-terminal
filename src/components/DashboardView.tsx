@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   TrendingUp, 
   PenTool as Tool, 
@@ -60,6 +60,14 @@ export default function DashboardView({
   const [hasCustomLogo, setHasCustomLogo] = useState<boolean>(() => {
     return !!localStorage.getItem('torky_custom_logo');
   });
+
+  useEffect(() => {
+    const handleLogoSync = () => {
+      setHasCustomLogo(!!localStorage.getItem('torky_custom_logo'));
+    };
+    window.addEventListener('torky_logo_changed', handleLogoSync);
+    return () => window.removeEventListener('torky_logo_changed', handleLogoSync);
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showResetAllConfirm, setShowResetAllConfirm] = useState<boolean>(false);
   const [showResetSuccessAlert, setShowResetSuccessAlert] = useState<boolean>(false);
@@ -75,6 +83,13 @@ export default function DashboardView({
         localStorage.setItem('torky_custom_logo', result);
         setHasCustomLogo(true);
         window.dispatchEvent(new Event('torky_logo_changed'));
+        
+        // Sync to central database
+        fetch('/api/db/torky_custom_logo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: result })
+        }).catch(err => console.warn('[Logo Sync] Failed uploading logo to server:', err));
       }
     };
     reader.readAsDataURL(file);
@@ -84,6 +99,13 @@ export default function DashboardView({
     localStorage.removeItem('torky_custom_logo');
     setHasCustomLogo(false);
     window.dispatchEvent(new Event('torky_logo_changed'));
+    
+    // Sync to central database
+    fetch('/api/db/torky_custom_logo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: null })
+    }).catch(err => console.warn('[Logo Sync] Failed resetting logo on server:', err));
   };
 
   // Method to download all database states as json file for offline persistence backup

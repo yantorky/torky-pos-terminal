@@ -149,8 +149,12 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_staffs', JSON.stringify(staffs));
-    syncKeyToServer('cs_pos_staffs', staffs);
+    const current = localStorage.getItem('cs_pos_staffs');
+    const incoming = JSON.stringify(staffs);
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_staffs', incoming);
+      syncKeyToServer('cs_pos_staffs', staffs);
+    }
   }, [staffs]);
 
   // USD Global Currency Exchange Rate tracking
@@ -166,8 +170,12 @@ export default function App() {
   const [isSyncingExchangeRate, setIsSyncingExchangeRate] = useState<boolean>(false);
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_usd_rate', usdRate.toString());
-    syncKeyToServer('cs_pos_usd_rate', usdRate);
+    const current = localStorage.getItem('cs_pos_usd_rate');
+    const incoming = usdRate.toString();
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_usd_rate', incoming);
+      syncKeyToServer('cs_pos_usd_rate', usdRate);
+    }
   }, [usdRate]);
 
   // Handle global currency conversion rate updater
@@ -309,10 +317,14 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_store_config', JSON.stringify(storeConfig));
-    syncKeyToServer('cs_pos_store_config', storeConfig);
-    // Trigger live event for UI components to reload
-    window.dispatchEvent(new Event('torky_store_changed'));
+    const current = localStorage.getItem('cs_pos_store_config');
+    const incoming = JSON.stringify(storeConfig);
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_store_config', incoming);
+      syncKeyToServer('cs_pos_store_config', storeConfig);
+      // Trigger live event for UI components to reload
+      window.dispatchEvent(new Event('torky_store_changed'));
+    }
   }, [storeConfig]);
 
   // Dynamic role PIN configuration
@@ -327,8 +339,12 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_role_pins', JSON.stringify(rolePins));
-    syncKeyToServer('cs_pos_role_pins', rolePins);
+    const current = localStorage.getItem('cs_pos_role_pins');
+    const incoming = JSON.stringify(rolePins);
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_role_pins', incoming);
+      syncKeyToServer('cs_pos_role_pins', rolePins);
+    }
   }, [rolePins]);
 
   // Interactive UI Simulation Settings
@@ -373,38 +389,66 @@ export default function App() {
 
   // Save changes to localStorage and replicate to the master POS database server
   useEffect(() => {
-    localStorage.setItem('cs_pos_products', JSON.stringify(products));
-    syncKeyToServer('cs_pos_products', products);
+    const current = localStorage.getItem('cs_pos_products');
+    const incoming = JSON.stringify(products);
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_products', incoming);
+      syncKeyToServer('cs_pos_products', products);
+    }
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_jobs', JSON.stringify(jobs));
-    syncKeyToServer('cs_pos_jobs', jobs);
+    const current = localStorage.getItem('cs_pos_jobs');
+    const incoming = JSON.stringify(jobs);
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_jobs', incoming);
+      syncKeyToServer('cs_pos_jobs', jobs);
+    }
   }, [jobs]);
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_transactions', JSON.stringify(transactions));
-    syncKeyToServer('cs_pos_transactions', transactions);
+    const current = localStorage.getItem('cs_pos_transactions');
+    const incoming = JSON.stringify(transactions);
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_transactions', incoming);
+      syncKeyToServer('cs_pos_transactions', transactions);
+    }
   }, [transactions]);
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_customers', JSON.stringify(customers));
-    syncKeyToServer('cs_pos_customers', customers);
+    const current = localStorage.getItem('cs_pos_customers');
+    const incoming = JSON.stringify(customers);
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_customers', incoming);
+      syncKeyToServer('cs_pos_customers', customers);
+    }
   }, [customers]);
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_suppliers', JSON.stringify(suppliers));
-    syncKeyToServer('cs_pos_suppliers', suppliers);
+    const current = localStorage.getItem('cs_pos_suppliers');
+    const incoming = JSON.stringify(suppliers);
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_suppliers', incoming);
+      syncKeyToServer('cs_pos_suppliers', suppliers);
+    }
   }, [suppliers]);
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_licensed_key', licensedKey);
-    syncKeyToServer('cs_pos_licensed_key', licensedKey);
+    const current = localStorage.getItem('cs_pos_licensed_key');
+    const incoming = licensedKey;
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_licensed_key', incoming);
+      syncKeyToServer('cs_pos_licensed_key', licensedKey);
+    }
   }, [licensedKey]);
 
   useEffect(() => {
-    localStorage.setItem('cs_pos_installation_id', installationId);
-    syncKeyToServer('cs_pos_installation_id', installationId);
+    const current = localStorage.getItem('cs_pos_installation_id');
+    const incoming = installationId;
+    if (current !== incoming) {
+      localStorage.setItem('cs_pos_installation_id', incoming);
+      syncKeyToServer('cs_pos_installation_id', installationId);
+    }
   }, [installationId]);
 
   // Unified State Synchronization Engine (Initial Load & Inter-Device Replication)
@@ -475,6 +519,10 @@ export default function App() {
               setClientRajaongkirKey(serverData.cs_pos_rajaongkir_key);
               localStorage.setItem('cs_pos_rajaongkir_key', serverData.cs_pos_rajaongkir_key);
             }
+            if (serverData.torky_custom_logo !== undefined && serverData.torky_custom_logo !== null) {
+              localStorage.setItem('torky_custom_logo', serverData.torky_custom_logo);
+              window.dispatchEvent(new Event('torky_logo_changed'));
+            }
           } else {
             console.log('[Torky Sync] Central database empty, pushing current browser settings up as bootstrap state.');
             const bootstrapPayload = {
@@ -492,6 +540,7 @@ export default function App() {
               cs_pos_usd_rate_sync_time: usdRateSyncTime,
               cs_pos_biteship_key: clientBiteshipKey,
               cs_pos_rajaongkir_key: clientRajaongkirKey,
+              torky_custom_logo: localStorage.getItem('torky_custom_logo'),
             };
 
             await fetch('/api/db-bulk', {
@@ -559,6 +608,17 @@ export default function App() {
             if (serverData.cs_pos_installation_id) {
               setInstallationId(serverData.cs_pos_installation_id);
               localStorage.setItem('cs_pos_installation_id', serverData.cs_pos_installation_id);
+            }
+            if (serverData.torky_custom_logo !== undefined) {
+              const currentLogo = localStorage.getItem('torky_custom_logo');
+              if (serverData.torky_custom_logo !== currentLogo) {
+                if (serverData.torky_custom_logo === null || serverData.torky_custom_logo === "") {
+                  localStorage.removeItem('torky_custom_logo');
+                } else {
+                  localStorage.setItem('torky_custom_logo', serverData.torky_custom_logo);
+                }
+                window.dispatchEvent(new Event('torky_logo_changed'));
+              }
             }
           }
         }
