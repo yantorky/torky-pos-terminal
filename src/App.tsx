@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   Receipt,
@@ -35,7 +35,7 @@ import ActivationGate from './components/ActivationGate';
 import ClientGuideModal from './components/ClientGuideModal';
 
 // Import secure offline licensing helper
-import { generateLicenseFromId } from './utils';
+import { generateLicenseFromId, copyToClipboard } from './utils';
 
 // Import types & seeds
 import { Product, RepairJob, Transaction, JobStatus, Customer, Supplier, UserRole, Staff } from './types';
@@ -50,9 +50,11 @@ import {
 
 export default function App() {
   const [isInitialLoaded, setIsInitialLoaded] = useState<boolean>(false);
+  const lastWriteTimeRef = useRef<number>(0);
 
   const syncKeyToServer = (key: string, value: any) => {
     if (!isInitialLoaded) return;
+    lastWriteTimeRef.current = Date.now();
     fetch(`/api/db/${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -105,7 +107,11 @@ export default function App() {
   // Verify license validity dynamically based on repo owner rules (Yan Torky)
   const isLicenseKeyValid = (key: string): boolean => {
     const val = key.trim().toUpperCase();
-    if (val === 'TORKY-POS-8822-APPROVED' || val === 'YANTORKY-LICENSE-2026-VALD') {
+    if (
+      val === 'TORKY-POS-8822-APPROVED' ||
+      val === 'YANTORKY-LICENSE-2026-VALD' ||
+      val.startsWith('YNTK-MASTER-')
+    ) {
       return true;
     }
     
@@ -458,7 +464,13 @@ export default function App() {
         const res = await fetch('/api/db');
         if (res.ok) {
           const serverData = await res.json();
-          const hasServerData = serverData && Object.keys(serverData).length > 0;
+          const hasServerData = serverData && (
+            serverData.cs_pos_products ||
+            serverData.cs_pos_licensed_key ||
+            serverData.cs_pos_store_config ||
+            serverData.cs_pos_jobs ||
+            serverData.torky_has_custom_logo === true
+          );
 
           if (hasServerData) {
             console.log('[Torky Sync] Centralized database loaded from server:', serverData);
@@ -467,14 +479,8 @@ export default function App() {
               setProducts(serverData.cs_pos_products);
               localStorage.setItem('cs_pos_products', JSON.stringify(serverData.cs_pos_products));
             }
-            if (serverData.cs_pos_installation_id) {
-              setInstallationId(serverData.cs_pos_installation_id);
-              localStorage.setItem('cs_pos_installation_id', serverData.cs_pos_installation_id);
-            }
-            if (serverData.cs_pos_licensed_key !== undefined) {
-              setLicensedKey(serverData.cs_pos_licensed_key);
-              localStorage.setItem('cs_pos_licensed_key', serverData.cs_pos_licensed_key);
-            }
+            // Keep unique device identification and license local to each terminal
+            // do not overwrite with other terminal's entries from global centralized db
             if (serverData.cs_pos_jobs) {
               setJobs(serverData.cs_pos_jobs);
               localStorage.setItem('cs_pos_jobs', JSON.stringify(serverData.cs_pos_jobs));
@@ -565,11 +571,24 @@ export default function App() {
     initSync();
   }, []);
 
+  // Listen to local logo uploaded / reset events to trigger a temporary sync write cooldown
+  useEffect(() => {
+    const handleLogoChanged = () => {
+      lastWriteTimeRef.current = Date.now();
+    };
+    window.addEventListener('torky_logo_changed', handleLogoChanged);
+    return () => window.removeEventListener('torky_logo_changed', handleLogoChanged);
+  }, []);
+
   // Periodic State Reconciliation Pulls from server db (makes multiclients updates synchronized automatically)
   useEffect(() => {
     if (!isInitialLoaded) return;
     
     const interval = setInterval(async () => {
+      // Cooldown protection: skip pull if any write just occurred in last 10 seconds
+      if (Date.now() - lastWriteTimeRef.current < 10000) {
+        return;
+      }
       try {
         const res = await fetch('/api/db');
         if (res.ok) {
@@ -607,14 +626,8 @@ export default function App() {
               setRolePins(serverData.cs_pos_role_pins);
               localStorage.setItem('cs_pos_role_pins', JSON.stringify(serverData.cs_pos_role_pins));
             }
-            if (serverData.cs_pos_licensed_key !== undefined) {
-              setLicensedKey(serverData.cs_pos_licensed_key);
-              localStorage.setItem('cs_pos_licensed_key', serverData.cs_pos_licensed_key);
-            }
-            if (serverData.cs_pos_installation_id) {
-              setInstallationId(serverData.cs_pos_installation_id);
-              localStorage.setItem('cs_pos_installation_id', serverData.cs_pos_installation_id);
-            }
+            // Keep unique device identification and license local to each terminal
+            // do not overwrite with other terminal's entries from global centralized db
             if (serverData.torky_has_custom_logo !== undefined) {
               const currentLogo = localStorage.getItem('torky_custom_logo');
               if (serverData.torky_has_custom_logo) {
@@ -1798,16 +1811,18 @@ export default function App() {
                 <button
                   type="button"
                   id="copy-gen-btn"
-                  onClick={() => {
+                  onClick={async () => {
                     const resultInput = document.getElementById('gen-license-result') as HTMLInputElement;
                     if (resultInput && resultInput.value && resultInput.value !== 'TULISKAN ID DI ATAS') {
-                      navigator.clipboard.writeText(resultInput.value);
-                      const label = document.getElementById('copy-gen-btn-label');
-                      if (label) {
-                        label.innerText = 'SALIN BERHASIL!';
-                        setTimeout(() => {
-                          if (label) label.innerText = 'SALIN KUNCI LISENSI';
-                        }, 2000);
+                      const ok = await copyToClipboard(resultInput.value);
+                      if (ok) {
+                        const label = document.getElementById('copy-gen-btn-label');
+                        if (label) {
+                          label.innerText = 'SALIN BERHASIL!';
+                          setTimeout(() => {
+                            if (label) label.innerText = 'SALIN KUNCI LISENSI';
+                          }, 2000);
+                        }
                       }
                     }
                   }}

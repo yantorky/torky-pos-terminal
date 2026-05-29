@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Mail, Clipboard, CheckCircle2, LockKeyhole, HelpCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { copyToClipboard } from '../utils';
 
 interface ActivationGateProps {
   installationId: string;
@@ -20,11 +21,14 @@ export default function ActivationGate({
   const [errorMsg, setErrorMsg] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const handleCopyId = () => {
-    navigator.clipboard.writeText(installationId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyId = async () => {
+    const ok = await copyToClipboard(installationId);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

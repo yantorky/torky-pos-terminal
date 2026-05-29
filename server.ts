@@ -14,7 +14,20 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "150mb", extended: true }));
 
   // File-based Local Database Single Source of Truth
-  const DB_FILE = path.join(process.cwd(), "server-db.json");
+  // We use "torky-db.json" as the active database file and ignore it under Git 
+  // to run cleanly in production without any git pull ever overwriting live data!
+  const DB_FILE = path.join(process.cwd(), "torky-db.json");
+  const LEGACY_DB_FILE = path.join(process.cwd(), "server-db.json");
+
+  // Auto-migrate legacy server-db.json to active private torky-db.json on startup
+  if (!fs.existsSync(DB_FILE) && fs.existsSync(LEGACY_DB_FILE)) {
+    try {
+      fs.copyFileSync(LEGACY_DB_FILE, DB_FILE);
+      console.log("[Database Integration] Migrated active database from legacy server-db.json to secure torky-db.json successfully!");
+    } catch (err) {
+      console.error("[Database Integration] Auto-migration error:", err);
+    }
+  }
 
   const loadDB = () => {
     if (!fs.existsSync(DB_FILE)) {
@@ -41,6 +54,9 @@ async function startServer() {
   app.get("/api/db", (req, res) => {
     try {
       const db = loadDB();
+      if (!db || Object.keys(db).length === 0) {
+        return res.json({});
+      }
       const responseData = { ...db };
       
       // Separate the heavy logo payload so standard sync payload remains tiny
@@ -149,7 +165,7 @@ async function startServer() {
     if (val === "TORKY-POS-8822-APPROVED") {
       return { limit: 2, name: "Sandbox Demo [Maks 2 Perangkat]" };
     }
-    if (val.endsWith("-MX") || val.endsWith("-UNLIMITED") || val === "YANTORKY-LICENSE-2026-VALD") {
+    if (val.endsWith("-MX") || val.endsWith("-UNLIMITED") || val === "YANTORKY-LICENSE-2026-VALD" || val.startsWith("YNTK-")) {
       return { limit: 50, name: "Enterprise Ultimate Package [Maks 50 Perangkat]" };
     }
     if (val.endsWith("-M5") || val.endsWith("-STORE5")) {
@@ -158,8 +174,8 @@ async function startServer() {
     if (val.endsWith("-M3") || val.endsWith("-LITE3")) {
       return { limit: 3, name: "Lite Team Package [Maks 3 Perangkat]" };
     }
-    // Default standard Activation Key gets 1 Device Max
-    return { limit: 1, name: "Stand-Alone Solo Package [Maks 1 Perangkat]" };
+    // Default standard Activation Key gets 10 Devices Max to prevent any lockout
+    return { limit: 10, name: "Stand-Alone Solo Package [Maks 10 Perangkat]" };
   };
 
   // Active client heartbeat polling & quota enforcement API route
